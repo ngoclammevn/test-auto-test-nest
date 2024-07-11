@@ -1,0 +1,31 @@
+name: Lint Code
+
+on:
+  pull_request:
+    branches: ['dev-vn', 'staging', 'main']
+
+permissions:
+  contents: 'read'
+  actions: 'read'
+
+jobs:
+  test:
+    name: Linting and unit testing
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Start installing pnpm package manager
+        run: npm i -g pnpm@8.7.5
+      - name: Start installing dependencies
+        run: pnpm install
+      - name: Run lint
+        run: pnpm run lint
