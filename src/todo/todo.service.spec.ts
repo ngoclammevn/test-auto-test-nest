@@ -2,12 +2,14 @@ import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CreateTodoDto } from './dto/create-todo.dto';
+import { UpdateTodoDto } from './dto/update-todo.dto';
 import { Todo } from './entities/todo.entity';
 import { TodoService } from './todo.service';
 
 describe('TodoService', () => {
-  let service: TodoService;
-  let mockTodoRepository: Partial<Repository<Todo>>;
+  let todoService: TodoService;
+  let todoRepo: Repository<Todo>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -15,52 +17,133 @@ describe('TodoService', () => {
         TodoService,
         {
           provide: getRepositoryToken(Todo),
-          useValue: {
-            find: jest.fn(),
-            findOne: jest.fn(),
-            save: jest.fn(),
-          },
+          useClass: Repository,
         },
       ],
     }).compile();
 
-    service = module.get<TodoService>(TodoService);
-    mockTodoRepository = module.get<Repository<Todo>>(getRepositoryToken(Todo));
+    todoService = module.get<TodoService>(TodoService);
+    todoRepo = module.get<Repository<Todo>>(getRepositoryToken(Todo));
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  describe('create', () => {
+    it('should create a new todo', async () => {
+      const createTodoDto: CreateTodoDto = {
+        title: 'Test Todo',
+        isCompleted: false,
+      };
+      const savedTodo: Todo = {
+        id: 1,
+        title: 'Test Todo',
+        isCompleted: false,
+      };
+
+      jest.spyOn(todoRepo, 'create').mockReturnValue(savedTodo);
+      jest.spyOn(todoRepo, 'save').mockResolvedValue(savedTodo);
+
+      const result = await todoService.create(createTodoDto);
+
+      expect(todoRepo.create).toHaveBeenCalledWith(createTodoDto);
+      expect(todoRepo.save).toHaveBeenCalledWith(savedTodo);
+      expect(result).toEqual(savedTodo);
+    });
   });
 
-  it('Test get data', async () => {
-    jest.spyOn(mockTodoRepository, 'find').mockResolvedValue([
-      { id: 1, title: 'test', isCompleted: false },
-      { id: 2, title: 'test2', isCompleted: false },
-    ]);
-    const todoList = await service.findAll();
+  describe('findAll', () => {
+    it('should return all todos', async () => {
+      const todos: Todo[] = [
+        {
+          id: 1,
+          title: 'Todo 1',
+          isCompleted: false,
+        },
+        {
+          id: 2,
+          title: 'Todo 2',
+          isCompleted: false,
+        },
+      ];
 
-    expect(todoList.length).toBe(2);
+      jest.spyOn(todoRepo, 'find').mockResolvedValue(todos);
+
+      const result = await todoService.findAll();
+
+      expect(todoRepo.find).toHaveBeenCalled();
+      expect(result).toEqual(todos);
+    });
   });
 
   describe('findOne', () => {
     it('should return a todo by id', async () => {
-      jest
-        .spyOn(mockTodoRepository, 'findOne')
-        .mockResolvedValue({ id: 1, title: 'test', isCompleted: false });
+      const todoId = 1;
+      const todo: Todo = {
+        id: todoId,
+        title: 'Test Todo',
+        isCompleted: false,
+      };
 
-      const todo = await service.findOne(1);
-      expect(mockTodoRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 1 },
-      });
-      expect(todo).toEqual({ id: 1, title: 'test', isCompleted: false });
+      jest.spyOn(todoRepo, 'findOne').mockResolvedValue(todo);
+
+      const result = await todoService.findOne(todoId);
+
+      expect(todoRepo.findOne).toHaveBeenCalledWith({ where: { id: todoId } });
+      expect(result).toEqual(todo);
     });
 
-    it('should throw an error if todo not found', async () => {
-      jest.spyOn(mockTodoRepository, 'findOne').mockResolvedValue(null);
+    it('should throw NotFoundException if todo is not found', async () => {
+      const todoId = 1;
 
-      await expect(service.findOne(1)).rejects.toThrow(
-        new NotFoundException('Todo not found'),
+      jest.spyOn(todoRepo, 'findOne').mockResolvedValue(undefined);
+
+      await expect(todoService.findOne(todoId)).rejects.toThrowError(
+        NotFoundException,
       );
+    });
+  });
+
+  describe('update', () => {
+    it('should update a todo', async () => {
+      const todoId = 1;
+      const updateTodoDto: UpdateTodoDto = { title: 'Updated Todo' };
+      const todo: Todo = {
+        id: todoId,
+        title: 'Test Todo',
+        isCompleted: false,
+      };
+      const updatedTodo: Todo = {
+        id: todoId,
+        title: 'Updated Todo',
+        isCompleted: false,
+      };
+
+      jest.spyOn(todoService, 'findOne').mockResolvedValue(todo);
+      jest.spyOn(todoRepo, 'save').mockResolvedValue(updatedTodo);
+
+      const result = await todoService.update(todoId, updateTodoDto);
+
+      expect(todoService.findOne).toHaveBeenCalledWith(todoId);
+      expect(todoRepo.save).toHaveBeenCalledWith(updatedTodo);
+      expect(result).toEqual(updatedTodo);
+    });
+  });
+
+  describe('remove', () => {
+    it('should remove a todo', async () => {
+      const todoId = 1;
+      const todo: Todo = {
+        id: todoId,
+        title: 'Test Todo',
+        isCompleted: false,
+      };
+
+      jest.spyOn(todoService, 'findOne').mockResolvedValue(todo);
+      jest.spyOn(todoRepo, 'remove').mockResolvedValue(undefined);
+
+      const result = await todoService.remove(todoId);
+
+      expect(todoService.findOne).toHaveBeenCalledWith(todoId);
+      expect(todoRepo.remove).toHaveBeenCalledWith(todo);
+      expect(result).toBeUndefined();
     });
   });
 });
