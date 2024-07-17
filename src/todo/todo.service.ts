@@ -27,13 +27,9 @@ export class TodoService {
   }
 
   async update(id: number, updateTodoDto: UpdateTodoDto) {
-    const b = 1;
     const todo = await this.findOne(id);
     const updatedTodo = { ...todo, ...updateTodoDto };
-    console.log(updatedTodo);
-
-    return 1;
-    // return this.todoRepo.save(updatedTodo);
+    return this.todoRepo.save(updatedTodo);
   }
 
   async remove(id: number) {
